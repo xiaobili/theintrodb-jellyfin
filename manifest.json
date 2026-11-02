@@ -10,11 +10,11 @@
     "versions": [
       {
         "version": "1.4.0.0",
-        "changelog": "## What's New\r\n\r\n### :tada: New features\r\n\r\n* feat: add introdb.app as an alternative data source, switchable from the plugin settings page\r\n* feat: fall back to the other source automatically when the selected one has no data or cannot address an item (introdb.app needs an IMDb id)\r\n* feat: non-default episode orders (DVD, alternate, absolute, ...) stay resolved through TheIntroDB when introdb.app is selected, so series never get another episode's segments\r\n\r\nThe not-found cache is now keyed by the lookup plan, so switching sources re-checks items whose previous miss was recorded against the other one.\r\n\r\n**Full Changelog**: https://github.com/xiaobili/theintrodb-jellyfin/commits/main\r\n",
+        "changelog": "See release notes\n",
         "targetAbi": "12.0.0.0",
         "sourceUrl": "https://github.com/xiaobili/theintrodb-jellyfin/releases/download/v1.4.0.0/theintrodb_1.4.0.0.zip",
-        "checksum": "",
-        "timestamp": "2026-11-02T05:53:59Z"
+        "checksum": "4fe88babad634db71f1613e5fdb5d7fd",
+        "timestamp": "2026-11-02T06:14:31Z"
       }
     ]
   }
