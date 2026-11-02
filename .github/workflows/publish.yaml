@@ -120,7 +120,11 @@ jobs:
           # Escape changelog for JSON (replace newlines with \n)
           CHANGELOG_JSON=$(echo "$CHANGELOG" | jq -Rs .)
 
-          # Add new version to manifest (dedupe by version, sort newest-first)
+          # Add new version to manifest (replace any same-version entry, sort newest-first).
+          # The old `unique_by(.version)` kept whichever duplicate jq's sort happened to
+          # put first, so a hand-written entry for the version being released swallowed
+          # the real checksum/changelog. Dropping the stale entry first makes the freshly
+          # built artifact authoritative.
           jq --argjson v "{
             \"version\": \"$VERSION\",
             \"changelog\": $CHANGELOG_JSON,
@@ -134,7 +138,7 @@ jobs:
                | sub("^v";"")
                | split(".")
                | map(tonumber? // 0));
-            .[0].versions = ((.[0].versions + [$v]) | unique_by(.version) | sort_by(vkey) | reverse)
+            .[0].versions = ((.[0].versions | map(select(.version != $v.version)) + [$v]) | sort_by(vkey) | reverse)
           ' manifest.json > manifest.json.tmp
           mv manifest.json.tmp manifest.json
 

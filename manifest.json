@@ -2,115 +2,19 @@
   {
     "guid": "c9e41b95-63e4-45e2-9db6-b83df21ae5e7",
     "name": "TheIntroDB",
-    "description": "Adds skip segments for intros, recaps, credits, and previews from TheIntroDB's API.\n",
-    "overview": "Adds skip segments for intros, recaps, credits, and previews from TheIntroDB's API.",
-    "owner": "TheIntroDB",
+    "description": "Adds skip segments for intros, recaps, credits, and previews from TheIntroDB's API, with introdb.app selectable as the data source.\n",
+    "overview": "Adds skip segments for intros, recaps, credits, and previews from TheIntroDB's API, with introdb.app selectable as the data source.",
+    "owner": "xiaobili",
     "imageUrl": "https://raw.githubusercontent.com/TheIntroDB/theintrodb-assets/main/logo-banner.png",
     "category": "General",
     "versions": [
       {
-        "version": "1.3.0.0",
-        "changelog": "## What's New\r\n\r\n### :tada: New features\r\n\r\n* feat: refresh own segments after a configurable interval, ignore unserved segments (#36) @ojsef39, @claude, @Pasithea0\r\n\r\n### :bug: Bug fixes\r\n\r\n* fix: defer on-demand fetch of episodes until their series has a TVDB or TMDB id (#34) @ojsef39, @claude, @Pasithea0\r\n* fix: treat a 0/0 credits or preview timestamp as absent (#35) @ojsef39, @claude, @Pasithea0\r\n\n",
+        "version": "1.4.0.0",
+        "changelog": "## What's New\r\n\r\n### :tada: New features\r\n\r\n* feat: add introdb.app as an alternative data source, switchable from the plugin settings page\r\n* feat: fall back to the other source automatically when the selected one has no data or cannot address an item (introdb.app needs an IMDb id)\r\n* feat: non-default episode orders (DVD, alternate, absolute, ...) stay resolved through TheIntroDB when introdb.app is selected, so series never get another episode's segments\r\n\r\nThe not-found cache is now keyed by the lookup plan, so switching sources re-checks items whose previous miss was recorded against the other one.\r\n\r\n**Full Changelog**: https://github.com/xiaobili/theintrodb-jellyfin/commits/main\r\n",
         "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.3.0.0/theintrodb_1.3.0.0.zip",
-        "checksum": "916be0f9ac9d13119f7b9c42802b60c7",
-        "timestamp": "2026-10-20T19:13:22Z"
-      },
-      {
-        "version": "1.2.0.0",
-        "changelog": "## What's Changed\r\n* feat: move to TheIntroDB API v4 with episode-order aware lookups by @Pasithea0 in https://github.com/TheIntroDB/jellyfin-plugin/pull/33\r\n\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.1.3.0...v1.2.0.0\n",
-        "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.2.0.0/theintrodb_1.2.0.0.zip",
-        "checksum": "c804df2cb989669e1f0ed04a7ef6cbcb",
-        "timestamp": "2026-10-17T19:45:07Z"
-      },
-      {
-        "version": "1.1.3.0",
-        "changelog": "Changes made:\r\n- reorganized settings page\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.1.2.0...v1.1.3.0\n",
-        "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.1.3.0/theintrodb_1.1.3.0.zip",
-        "checksum": "cda9d7125db91ef0ffd05d10f4456bf3",
-        "timestamp": "2026-09-18T19:00:39Z"
-      },
-      {
-        "version": "1.1.2.0",
-        "changelog": "fix: stop per-item log spam when the daily API budget is exhausted\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.1.1.0...v1.1.2.0\n",
-        "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.1.2.0/theintrodb_1.1.2.0.zip",
-        "checksum": "6cdc1ef856209b1c192d429909ff0987",
-        "timestamp": "2026-09-18T04:31:40Z"
-      },
-      {
-        "version": "1.1.1.0",
-        "changelog": "## Changes made\r\n- Added 404 cache to help with recurring scans getting limited\r\n- Added clear cache button to settings page\r\n- Fixed some rate limiting issues\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.1.0.0...v1.1.1.0\n",
-        "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.1.1.0/theintrodb_1.1.1.0.zip",
-        "checksum": "fd8178a4c0be231f999267fd49c5bd48",
-        "timestamp": "2026-09-16T16:25:48Z"
-      },
-      {
-        "version": "1.1.0.1",
-        "changelog": "## What's Changed\r\n* fix: add Jellyfin 12.0 compatibility (CleanupExtractedData + net10.0) by @Pasithea0 in https://github.com/TheIntroDB/jellyfin-plugin/pull/21\r\n* fix: download hash\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.0.7.4...v1.1.0.1\n",
-        "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.1.0.1/theintrodb_1.1.0.1.zip",
-        "checksum": "d43619dca2f4ca23c15e406a072afb36",
-        "timestamp": "2026-09-08T19:22:32Z"
-      },
-      {
-        "version": "1.1.0.0",
-        "changelog": "## Changes made\r\n- Add Jellyfin 12.0 compatibility\r\n- Implement CleanupExtractedData for IMediaSegmentProvider interface\r\n- Update target framework to .NET 10.0\r\n- Update NuGet packages to 12.0.x\r\n",
-        "targetAbi": "12.0.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.1.0.0/theintrodb_1.1.0.0.zip",
+        "sourceUrl": "https://github.com/xiaobili/theintrodb-jellyfin/releases/download/v1.4.0.0/theintrodb_1.4.0.0.zip",
         "checksum": "",
-        "timestamp": "2026-07-28T00:00:00Z"
-      },
-      {
-        "version": "1.0.7.4",
-        "changelog": "## What's Changed\n* fix: guard CTS disposal in usage reporting service against double dispose by @Pasithea0 in https://github.com/TheIntroDB/jellyfin-plugin/pull/24\n\nFixes https://github.com/TheIntroDB/jellyfin-plugin/issues/23 - Jellyfin no longer exits with an unhandled System.ObjectDisposedException on shutdown/restart.\n\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.0.7.3...v1.0.7.4\n",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.0.7.4/theintrodb_1.0.7.4.zip",
-        "checksum": "025bcdb4d9d7f6da613d1223640c9e4c",
-        "timestamp": "2026-08-31T14:07:07Z"
-      },
-      {
-        "version": "1.0.7.3",
-        "changelog": "## What's Changed\r\n* fix: rate-limit safety margin and preserve segments on transient API failures by @Pasithea0 in https://github.com/TheIntroDB/jellyfin-plugin/pull/22\r\n\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.0.7.2...v1.0.7.3\n",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.0.7.3/theintrodb_1.0.7.3.zip",
-        "checksum": "6adaafe58b116734d5cc6017dd8986b7",
-        "timestamp": "2026-08-17T18:42:56Z"
-      },
-      {
-        "version": "1.0.7.2",
-        "changelog": "## Changes made\r\n- Fix on demand fetching ignoring selected items filters \n",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.0.7.2/theintrodb_1.0.7.2.zip",
-        "checksum": "304dfeaa4c4021652a8a3fbe743407bf",
-        "timestamp": "2026-07-01T05:48:04Z"
-      },
-      {
-        "version": "1.0.7.1",
-        "changelog": "## Changes made\r\n- cleaned up “on library add” code to avoid shutdown race condition\n",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.0.7.1/theintrodb_1.0.7.1.zip",
-        "checksum": "3554308825d63993d40fa8de15ac7991",
-        "timestamp": "2026-06-29T22:20:11Z"
-      },
-      {
-        "version": "1.0.7.0",
-        "changelog": "## Changes made\r\n- Added support for .strm format video files\r\n- Added automatic file scanning when added to library (no manual/scheduled scan task required)\n",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.0.7.0/theintrodb_1.0.7.0.zip",
-        "checksum": "1a186822d0e05a6f82bf2bc54abb09ea",
-        "timestamp": "2026-06-28T18:54:07Z"
-      },
-      {
-        "version": "1.0.6.1",
-        "changelog": "## Changes made\r\n- Added TheIntroDB menu option to sidebar\r\n- Rounded API key test acceptance rate to two decimals\r\n\r\n**Full Changelog**: https://github.com/TheIntroDB/jellyfin-plugin/compare/v1.0.6.0...v1.0.6.1\n",
-        "targetAbi": "10.9.0.0",
-        "sourceUrl": "https://github.com/TheIntroDB/jellyfin-plugin/releases/download/v1.0.6.1/theintrodb_1.0.6.1.zip",
-        "checksum": "b59b31b9da718e37b71b5dc6532e3d34",
-        "timestamp": "2026-06-04T03:35:08Z"
+        "timestamp": "2026-11-02T05:53:59Z"
       }
     ]
   }
