@@ -19,7 +19,7 @@ namespace TheIntroDB.Api;
 /// stay under the window, and when a 429 shows the daily budget is exhausted we
 /// park until the bucket resets instead of probing every few minutes.
 /// </summary>
-public class TheIntroDbClient
+public class TheIntroDbClient : IIntroSegmentSource
 {
     // The API's /media burst ceiling is 30/10s anonymous and 120/10s authenticated.
     // Pacing sits below the ceiling on purpose: pacing exactly at it draws 429s
@@ -66,6 +66,61 @@ public class TheIntroDbClient
         _httpClient = httpClient;
         _plugin = plugin;
         _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public IntroDataSource Source => IntroDataSource.TheIntroDb;
+
+    /// <inheritdoc />
+    public bool CanAddress(IntroLookupRequest request)
+    {
+        if (request is null || !request.HasAnyId)
+        {
+            return false;
+        }
+
+        if (request.IsMovie)
+        {
+            return true;
+        }
+
+        if (!request.HasEpisodeNumbers)
+        {
+            return false;
+        }
+
+        // A non-default display order can only be honoured with a TVDB identity: a
+        // tmdb_id request is always read as TMDB numbering, so answering would look
+        // right and be another episode's data. An order with no TVDB equivalent
+        // cannot be expressed at all.
+        if (request.OrderUnsupported)
+        {
+            return false;
+        }
+
+        return request.Mapping is null || request.TvdbId is > 0;
+    }
+
+    /// <inheritdoc />
+    public bool IsRateLimitActive(IntroLookupRequest request)
+        => IsRateLimitActive(_logger, _plugin, request?.IsMovie ?? false, request?.IdSource ?? "none");
+
+    /// <inheritdoc />
+    public Task<MediaFetchResult> FetchAsync(IntroLookupRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return GetMediaAsync(
+            request.TmdbId,
+            request.TvdbId,
+            request.ImdbId,
+            request.IsMovie,
+            request.Season,
+            request.Episode,
+            request.DurationMs,
+            cancellationToken,
+            request.Mapping,
+            request.TvdbEpisodeId);
     }
 
     /// <summary>

@@ -17,20 +17,33 @@
     </style>
 </head>
 <body>
-    <div id="TheIntroDbConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox">
+    <div id="TheIntroDbConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
         <div data-role="content">
             <div class="content-primary">
                 <form id="TheIntroDbConfigForm">
                     <div class="sectionTitleContainer flex align-items-center">
                         <h2 class="sectionTitle">TheIntroDB</h2>
                     </div>
-                    <p class="fieldDescription">Segment data (intro, recap, credits, preview) is fetched from <a href="https://theintrodb.org" target="_blank" rel="noopener noreferrer">TheIntroDB API</a> (v4) using each item's TVDB, TMDB or IMDB ID. Segments are <strong>not</strong> loaded when you press play—run <strong>Dashboard → Scheduled Tasks → Media segment scan</strong> to populate them. Items need one of those IDs (e.g. from metadata) for the plugin to find segments. TVDB is preferred: it is the API's identity, and it is what lets series with a non-default display order (DVD, alternate, absolute, …) resolve to the right episode.</p>
+                    <p class="fieldDescription">Segment data (intro, recap, credits, preview) is fetched from a community database using each item's TVDB, TMDB or IMDb ID. Segments are <strong>not</strong> loaded when you press play—run <strong>Dashboard → Scheduled Tasks → Media segment scan</strong> to populate them. Items need one of those IDs (e.g. from metadata) for the plugin to find segments.</p>
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Data source</h3>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="DataSource">Segment data source</label>
+                            <select id="DataSource" name="DataSource" is="emby-select" class="emby-select-withcolor emby-select">
+                                <option value="theintrodb">TheIntroDB (theintrodb.org)</option>
+                                <option value="introdbapp">IntroDB (introdb.app)</option>
+                            </select>
+                            <div class="fieldDescription"><strong>TheIntroDB</strong> addresses a media by TVDB, TMDB or IMDb id and prefers TVDB, which is its identity. It converts series that number their episodes in a non-default order (DVD, alternate, absolute, …), takes an optional API key, and serves intro, recap, credits and preview.</div>
+                            <div class="fieldDescription" style="margin-top: 0.75em;"><strong>IntroDB</strong> (introdb.app) addresses a media by <strong>IMDb id only</strong> and needs no key. It serves intro, recap and outro (end credits). It has no preview, and its post-credit timestamps are ignored because Jellyfin has no segment type for them. Episodes in a non-default display order are skipped there, since introdb.app stores only the aired order.</div>
+                            <div class="fieldDescription" style="margin-top: 0.75em;">If the selected source has no data for an item—or cannot address it at all, as introdb.app cannot without an IMDb id—the other source is asked automatically before the item counts as having no segments. Misses are remembered per source, so switching the source re-checks items the previous one had no data for. Items that already have segments are left alone while <strong>Ignore media that already has segments</strong> is on: to pull their segments from the new source right away, remove their segments below or wait for the refresh interval.</div>
+                        </div>
+                    </div>
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Connection</h3>
                         <div class="inputContainer">
                             <label class="inputLabel inputLabelUnfocused" for="ApiKey">API key (optional)</label>
                             <input id="ApiKey" name="ApiKey" type="password" is="emby-input" autocomplete="off" />
-                            <div class="fieldDescription">Optional Bearer token; when set, your pending and accepted submissions are weighted higher in results, and requests use the signed-in rate limits (120 requests per 10 seconds, 100,000 lookups per day instead of 30 and 5,000). A key is what lets a large library scan finish in one run.</div>
+                            <div class="fieldDescription">Optional Bearer token for TheIntroDB; when set, your pending and accepted submissions are weighted higher in results, and requests use the signed-in rate limits (120 requests per 10 seconds, 100,000 lookups per day instead of 30 and 5,000). A key is what lets a large library scan finish in one run. It is only sent to TheIntroDB — introdb.app reads are anonymous and need no key.</div>
                             <div id="ApiKeyValidationStatus" class="fieldDescription" style="display: none; margin-top: 0.75em; align-items: center; gap: 0.5em;"></div>
                         </div>
                         <div class="inputContainer">
@@ -90,7 +103,7 @@
                             </label>
                             <div class="fieldDescription">When enabled, items that already have segments are skipped to avoid refetching. Only segments the library serves count, so a provider disabled in the library does not block TheIntroDB.</div>
                             <div class="fieldDescription" style="margin-top: 1em;">
-                                To ensure fair use, TheIntroDB API applies rate limits and a daily lookup budget. Anonymous installs are paced at 30 requests per 10 seconds and 5,000 lookups per day; with an API key the plugin uses the signed-in limits (120 requests per 10 seconds and 100,000 lookups per day), so a full library scan can finish in a single run. If a limit is reached, scanning pauses and resumes automatically after the cool-down period.
+                                To ensure fair use, both data sources apply rate limits; TheIntroDB also applies a daily lookup budget. Anonymous TheIntroDB installs are paced at 30 requests per 10 seconds and 5,000 lookups per day; with an API key the plugin uses the signed-in limits (120 requests per 10 seconds and 100,000 lookups per day), so a full library scan can finish in a single run. introdb.app reads are anonymous and paced at 10 requests per second. If a limit is reached, scanning pauses and resumes automatically after the cool-down period, and the other source still answers in the meantime.
                             </div>
                         </div>
                         <div class="inputContainer">
@@ -195,6 +208,7 @@
                 var lastValidatedApiKeyResult = '';
 
                 var apiKeyInput = document.querySelector('#ApiKey');
+                var dataSourceSelect = document.querySelector('#DataSource');
                 var apiKeyValidationStatusElement = document.querySelector('#ApiKeyValidationStatus');
                 var apiStatsOverlay = document.querySelector('#ApiStatsOverlay');
                 var apiStatsContentElement = document.querySelector('#ApiStatsContent');
@@ -217,6 +231,11 @@
 
                 function normalizeId(value) {
                     return (value || '').toString().replace(/-/g, '').toLowerCase();
+                }
+
+                function normalizeDataSource(value) {
+                    // Unknown or unset values mean "the previous behaviour": TheIntroDB.
+                    return (value || '').toString().trim().toLowerCase() === 'introdbapp' ? 'introdbapp' : 'theintrodb';
                 }
 
                 function dedupeIds(ids) {
@@ -1250,6 +1269,7 @@
                             var configuredLibraryIds = getSelectedLibraryIdsFromConfig(config);
 
                             apiKeyInput.value = config.ApiKey || '';
+                            dataSourceSelect.value = normalizeDataSource(config.DataSource);
                             resetApiValidationState();
                             setSelectedLibraries(ensureLibraryItemsForIds(configuredLibraryIds));
                             setSelectedShows(ensureShowItemsForIds(configuredShowIds));
@@ -1405,6 +1425,7 @@
                         Dashboard.showLoadingMsg();
                         ApiClient.getPluginConfiguration(pluginUniqueId).then(function (config) {
                             config.ApiKey = apiKeyInput.value || '';
+                            config.DataSource = normalizeDataSource(dataSourceSelect.value);
                             config.SelectedLibraryIds = selectedLibraryIds.join(',');
                             config.SelectedShowIds = selectedShowIds.join(',');
                             config.SelectedShowId = selectedShowIds.length ? selectedShowIds[0] : '';

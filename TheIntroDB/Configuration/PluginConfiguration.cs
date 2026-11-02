@@ -1,4 +1,5 @@
 using MediaBrowser.Model.Plugins;
+using TheIntroDB.Api;
 
 namespace TheIntroDB.Configuration;
 
@@ -13,6 +14,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public PluginConfiguration()
     {
         ApiKey = string.Empty;
+        DataSource = IntroDataSources.TheIntroDbId;
         SelectedShowId = string.Empty;
         SelectedShowIds = string.Empty;
         SelectedLibraryIds = string.Empty;
@@ -23,6 +25,14 @@ public class PluginConfiguration : BasePluginConfiguration
         IgnoreMediaWithExistingSegments = true;
         EnableAnonymousUsageReporting = true;
     }
+
+    /// <summary>
+    /// Gets or sets the primary data source, <c>theintrodb</c> or <c>introdbapp</c>
+    /// (see <see cref="IntroDataSources"/>). When it has no data for an item — or
+    /// cannot address it, as introdb.app cannot without an IMDb id — the other
+    /// source is queried as a fallback.
+    /// </summary>
+    public string DataSource { get; set; }
 
     /// <summary>
     /// Gets or sets the optional API key for TheIntroDB (Bearer token). When set, your pending and accepted submissions are weighted higher.

@@ -111,6 +111,7 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
         int? tmdbId = null;
         int? tvdbId = null;
         string? imdbId = null;
+        string? seriesImdbId = null;
         bool isMovie = false;
         int? season = null;
         int? episode = null;
@@ -131,6 +132,9 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
             tmdbId = GetTmdbId(ep.Series);
             tvdbId = GetTvdbId(ep.Series);
             imdbId = GetImdbId(ep) ?? GetImdbId(ep.Series);
+
+            // introdb.app indexes episodes by their show's IMDb id, not the episode's.
+            seriesImdbId = GetImdbId(ep.Series) ?? imdbId;
             season = ep.ParentIndexNumber;
             episode = ep.IndexNumber;
 
@@ -145,7 +149,7 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
             // numbering disagreement. Only sent alongside a TVDB identity.
             tvdbEpisodeId = GetTvdbEpisodeId(ep);
 
-            _logger.LogDebug("Episode: Name={Name}, Series={Series}, S{Season}E{Episode}, TmdbId={TmdbId}, TvdbId={TvdbId}, ImdbId={ImdbId}, Order={Order}, TvdbEpisodeId={TvdbEpisodeId}", item.Name, ep.SeriesName, season, episode, tmdbId, tvdbId, imdbId ?? "(none)", mapping ?? "default", tvdbEpisodeId);
+            _logger.LogDebug("Episode: Name={Name}, Series={Series}, S{Season}E{Episode}, TmdbId={TmdbId}, TvdbId={TvdbId}, ImdbId={ImdbId}, SeriesImdbId={SeriesImdbId}, Order={Order}, TvdbEpisodeId={TvdbEpisodeId}", item.Name, ep.SeriesName, season, episode, tmdbId, tvdbId, imdbId ?? "(none)", seriesImdbId ?? "(none)", mapping ?? "default", tvdbEpisodeId);
         }
         else if (item is Video video)
         {
@@ -153,44 +157,53 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
             tmdbId = GetTmdbId(video);
             tvdbId = GetTvdbId(video);
             imdbId = GetImdbId(video);
+            seriesImdbId = imdbId;
             season = video.ParentIndexNumber;
             episode = video.IndexNumber;
             _logger.LogDebug("Video: Name={Name}, TmdbId={TmdbId}, TvdbId={TvdbId}, ImdbId={ImdbId}, Season={Season}, Episode={Episode}", item.Name, tmdbId, tvdbId, imdbId ?? "(none)", season, episode);
         }
 
-        // A non-default display order can only be honoured with a TVDB identity: a
-        // tmdb_id request is always read as TMDB numbering, so answering would look
-        // right and be another episode's data. No segments beats wrong segments. An
-        // order TheIntroDB has no name for (a TMDB episode group's "storyArc", "tv",
-        // ...) cannot be expressed at all, TVDB id or not.
-        if (!isMovie && season.HasValue && episode.HasValue
-            && (unsupportedOrder || (mapping is not null && tvdbId is not > 0)))
+        var lookupRequest = new IntroLookupRequest
         {
-            var series = (item as Episode)?.Series;
-            LogOrderSkipOnce(series?.Id ?? item.Id, series?.Name ?? item.Name, unsupportedOrder);
-            return GetExistingSegments(request);
-        }
+            TmdbId = tmdbId,
+            TvdbId = tvdbId,
+            ImdbId = imdbId,
+            SeriesImdbId = seriesImdbId,
+            IsMovie = isMovie,
+            Season = season,
+            Episode = episode,
+            DurationMs = item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0
+                ? item.RunTimeTicks.Value / TimeSpan.TicksPerMillisecond
+                : null,
+            Mapping = mapping,
+            TvdbEpisodeId = tvdbEpisodeId,
+            OrderUnsupported = unsupportedOrder
+        };
 
-        // Daily usage budget exhausted: the client parks until the bucket rolls
-        // over, so nothing would be sent. Skip before the fetch path — keeping
-        // existing segments — instead of logging a per-item warning for every
-        // item in the scan.
-        var idSource = tvdbId is > 0 ? "tvdb" : tmdbId is > 0 ? "tmdb" : !string.IsNullOrWhiteSpace(imdbId) ? "imdb" : "none";
-        if (TheIntroDbClient.IsRateLimitActive(_logger, Plugin.Instance, isMovie, idSource))
-        {
-            return GetExistingSegments(request);
-        }
-
-        if ((!tmdbId.HasValue || tmdbId.Value <= 0) && (!tvdbId.HasValue || tvdbId.Value <= 0) && string.IsNullOrWhiteSpace(imdbId))
+        if (!lookupRequest.HasAnyId)
         {
             _logger.LogWarning("Early exit: no TmdbId, TvdbId, or ImdbId for {Name}", item.Name);
             return RememberNotFoundAndReturnEmpty(request);
         }
 
-        if (!isMovie && (!season.HasValue || !episode.HasValue))
+        if (!isMovie && !lookupRequest.HasEpisodeNumbers)
         {
             _logger.LogWarning("Early exit: TV episode missing season/episode for {Name}", item.Name);
             return RememberNotFoundAndReturnEmpty(request);
+        }
+
+        var httpClient = _httpClientFactory.CreateClient();
+        var router = IntroSegmentRouter.Create(httpClient, Plugin.Instance, _logger);
+        var resolutionOrder = router.GetResolutionOrder(lookupRequest);
+
+        // No source can express this item: the series numbers its episodes in an
+        // order no source converts, or in a non-default order with no TVDB id to
+        // express it against. No segments beats another episode's segments.
+        if (resolutionOrder.Count == 0)
+        {
+            var series = (item as Episode)?.Series;
+            LogOrderSkipOnce(series?.Id ?? item.Id, series?.Name ?? item.Name, unsupportedOrder);
+            return GetExistingSegments(request);
         }
 
         var refreshKey = $"item:{request.ItemId:N}";
@@ -224,20 +237,32 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
             }
         }
 
-        var cacheKey = BuildNotFoundKey(isMovie, tmdbId, tvdbId, imdbId, season, episode, mapping, tvdbEpisodeId);
+        // The plan is part of the key: a miss recorded against one source must not
+        // suppress a lookup the other can answer, and switching the configured
+        // source (or gaining the IMDb id introdb.app needs) has to re-ask.
+        var cacheKey = BuildPlanScopedKey(
+            resolutionOrder,
+            BuildNotFoundKey(isMovie, tmdbId, tvdbId, imdbId, season, episode, mapping, tvdbEpisodeId));
         if (TheIntroDbNotFoundCache.Instance.TryGetHit(cacheKey))
         {
-            _logger.LogDebug("Skipping {Name}: known not found in TheIntroDB (cached 404)", item.Name);
+            _logger.LogDebug("Skipping {Name}: known not found in {Sources} (cached 404)", item.Name, DescribePlan(resolutionOrder));
             return Array.Empty<MediaSegmentDto>();
         }
 
-        _logger.LogInformation("Fetching from TheIntroDB API: tmdbId={TmdbId}, tvdbId={TvdbId}, imdbId={ImdbId}, isMovie={IsMovie}, season={Season}, episode={Episode}, order={Order}, tvdbEpisodeId={TvdbEpisodeId}", tmdbId, tvdbId, imdbId, isMovie, season, episode, mapping ?? "default", tvdbEpisodeId);
-        var httpClient = _httpClientFactory.CreateClient();
-        var client = new TheIntroDbClient(httpClient, Plugin.Instance, _logger);
-        long? durationMs = item.RunTimeTicks.HasValue && item.RunTimeTicks.Value > 0
-            ? item.RunTimeTicks.Value / TimeSpan.TicksPerMillisecond
-            : null;
-        var result = await client.GetMediaAsync(tmdbId, tvdbId, imdbId, isMovie, season, episode, durationMs, cancellationToken, mapping, tvdbEpisodeId).ConfigureAwait(false);
+        _logger.LogInformation(
+            "Fetching segments from {Sources}: tmdbId={TmdbId}, tvdbId={TvdbId}, imdbId={ImdbId}, seriesImdbId={SeriesImdbId}, isMovie={IsMovie}, season={Season}, episode={Episode}, order={Order}, tvdbEpisodeId={TvdbEpisodeId}",
+            DescribePlan(resolutionOrder),
+            tmdbId,
+            tvdbId,
+            imdbId,
+            seriesImdbId,
+            isMovie,
+            season,
+            episode,
+            mapping ?? "default",
+            tvdbEpisodeId);
+        var outcome = await router.FetchAsync(lookupRequest, cancellationToken).ConfigureAwait(false);
+        var result = outcome.Result;
         if (result.IsRateLimited || result.IsError)
         {
             // Never treat a transient rate limit or error as an empty dataset:
@@ -247,7 +272,7 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
             {
                 // Genuine failures are rare and item-specific: keep them loud.
                 _logger.LogWarning(
-                    "TheIntroDB API request was an error for {Name}; preserving existing segments",
+                    "The segment lookup failed for {Name}; preserving existing segments",
                     item.Name);
             }
             else
@@ -256,7 +281,7 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
                 // 429; warning per item here would be one line per skipped
                 // library item (the observed 18k-line spam).
                 _logger.LogDebug(
-                    "TheIntroDB API request was rate limited for {Name}; preserving existing segments",
+                    "The segment lookup was rate limited for {Name}; preserving existing segments",
                     item.Name);
             }
 
@@ -270,7 +295,7 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
                 TheIntroDbNotFoundCache.RecentFetches.Remember(refreshKey, RefreshTtl(config.RefreshAfterDays, Random.Shared.NextDouble()));
             }
 
-            _logger.LogInformation("TheIntroDB API returned no data for {Name}", item.Name);
+            _logger.LogInformation("No data source returned segments for {Name} ({Sources})", item.Name, DescribePlan(resolutionOrder));
             TheIntroDbNotFoundCache.Instance.RememberNotFound(cacheKey);
             return Array.Empty<MediaSegmentDto>();
         }
@@ -328,6 +353,7 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
             {
                 ["host"] = "jellyfin",
                 ["media_type"] = isMovie ? "movie" : "episode",
+                ["data_source"] = outcome.AnsweredBy.HasValue ? outcome.AnsweredBy.Value.ToId() : "none",
                 ["has_tmdb"] = tmdbId.HasValue && tmdbId.Value > 0 ? 1 : 0,
                 ["has_tvdb"] = tvdbId.HasValue && tvdbId.Value > 0 ? 1 : 0,
                 ["has_imdb"] = !string.IsNullOrWhiteSpace(imdbId) ? 1 : 0,
@@ -399,6 +425,27 @@ public class TheIntroDbSegmentProvider : IMediaSegmentProvider
         TheIntroDbNotFoundCache.Instance.RememberNotFound($"item:{request.ItemId:N}");
         return Array.Empty<MediaSegmentDto>();
     }
+
+    /// <summary>
+    /// Names the sources a lookup will be answered by, in order, for the not-found
+    /// cache key. A miss is stored per plan: switching the configured source, or
+    /// gaining the IMDb id introdb.app needs, produces a different plan and therefore
+    /// a different key, so the stored miss cannot suppress a lookup the new plan can
+    /// answer.
+    /// </summary>
+    /// <param name="resolutionOrder">The addressable sources, in the order they are asked.</param>
+    /// <param name="mediaKey">The media identity from <see cref="BuildNotFoundKey"/>.</param>
+    /// <returns>The cache key.</returns>
+    internal static string BuildPlanScopedKey(IReadOnlyList<IIntroSegmentSource> resolutionOrder, string mediaKey)
+        => string.Join(">", resolutionOrder.Select(source => source.Source.ToId())) + ":" + mediaKey;
+
+    /// <summary>
+    /// Renders the resolution order for log lines, e.g. "theintrodb>introdbapp".
+    /// </summary>
+    /// <param name="resolutionOrder">The addressable sources, in the order they are asked.</param>
+    /// <returns>The plan as a string.</returns>
+    internal static string DescribePlan(IReadOnlyList<IIntroSegmentSource> resolutionOrder)
+        => string.Join(" -> ", resolutionOrder.Select(source => source.Source.GetDisplayName()));
 
     internal static string BuildNotFoundKey(bool isMovie, int? tmdbId, int? tvdbId, string? imdbId, int? season, int? episode, string? mapping, long? tvdbEpisodeId)
     {

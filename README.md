@@ -7,7 +7,7 @@
   <a href="https://discord.gg/INVITE"><img src="https://invidget.switchblade.xyz/INVITE"></a>
 </p> -->
 
-This plugin integrates [TheIntroDB API](https://api.theintrodb.org) with Jellyfin’s **Media Segments** feature. It fetches intro, recap, credits, and preview timestamps (API v4) and exposes them as Jellyfin media segments so clients can show skip buttons.
+This plugin integrates [TheIntroDB API](https://api.theintrodb.org) with Jellyfin’s **Media Segments** feature. It fetches intro, recap, credits, and preview timestamps (API v4) and exposes them as Jellyfin media segments so clients can show skip buttons. [IntroDB](https://introdb.app) can be selected as the data source instead, with automatic fallback to the other one.
 
 **Requirements:** Jellyfin 12+. **TVDB metadata is recommended**: TVDB is TheIntroDB's identity, and it is what lets series with a non-default display order (DVD, alternate, absolute, …) resolve to the correct episode. TMDB and IMDb ids still work as fallbacks.
 ([10.11.6+ version](https://github.com/TheIntroDB/jellyfin-plugin/releases/tag/v1.0.7.4)]
@@ -69,7 +69,8 @@ Easiest way to install:
 
 TheIntroDB plugin includes some configuration options to adjust and improve your experience.
 
-- **API Key**: You can enter your TheIntroDB API key to fetch your submissions even if they're still pending and prioritize yours in the averaging calculation. It also moves requests to the signed-in rate limits (120 requests per 10 s, 100,000 lookups per day instead of 30 and 5,000), which is what lets a full library scan finish in one run. The settings page validates the key server-side and shows your TheIntroDB contribution stats when the token is valid.
+- **Data Source**: Which community database to read from — **TheIntroDB** (theintrodb.org) or **IntroDB** (introdb.app). TheIntroDB addresses a media by TVDB, TMDB or IMDb id, prefers TVDB, converts non-default episode orders (DVD, alternate, absolute, …), accepts an optional API key, and serves intro, recap, credits and preview. IntroDB addresses a media by **IMDb id only**, needs no key, and serves intro, recap and outro: it has no preview, its post-credit timestamps are ignored (Jellyfin has no segment type for them), and episodes in a non-default display order are skipped because it stores only the aired order. Whenever the selected source has no data for an item — or cannot address it, as IntroDB cannot without an IMDb id — the other source is queried before the item counts as having no segments.
+- **API Key**: You can enter your TheIntroDB API key to fetch your submissions even if they're still pending and prioritize yours in the averaging calculation. It also moves requests to the signed-in rate limits (120 requests per 10 s, 100,000 lookups per day instead of 30 and 5,000), which is what lets a full library scan finish in one run. The settings page validates the key server-side and shows your TheIntroDB contribution stats when the token is valid. It is only ever sent to TheIntroDB.
 - **Selected Libraries And Shows**: Optionally limit the Media Segment Scan task from the plugin settings page. You can browse Jellyfin libraries, whitelist an entire library/folder, or pick individual series. When a filter is active, the plugin only fetches segments for items inside those selected libraries or for the selected shows.
 - **Segment Toggles**: (All enabled by default) You can disable each segment individually so they're not applied when fetching.
 - **Ignore Media That Already Has Segments**: (Enabled by default) Prevent refetching of media that already has segments. This is recommended for large libraries. Only segments the library serves count: a provider disabled in the library does not block TheIntroDB.
